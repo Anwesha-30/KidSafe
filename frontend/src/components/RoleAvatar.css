@@ -1,0 +1,35 @@
+.role-avatar { display: block; position: relative; width: 80px; height: 80px; border-radius: 24px; background: linear-gradient(145deg,#7397ff,#3e58b9); box-shadow: inset 1px 2px 2px #ffffff6b, inset -2px -3px 5px #173b8759, 0 8px 0 #314987, 0 14px 20px #25487826; perspective: 400px; }
+.role-avatar--child { background: linear-gradient(145deg,#8aedee,#2fa3bc); box-shadow: inset 1px 2px 2px #ffffff91, inset -2px -3px 5px #13759266, 0 8px 0 #23829b, 0 14px 20px #216e8a26; }
+.role-avatar__model { position: absolute; inset: 0; transform-style: preserve-3d; }
+.role-avatar__person { position: absolute; width: 38px; height: 53px; top: 14px; transform-style: preserve-3d; }
+.role-avatar__person--back { left: 34px; top: 10px; transform: scale(.83) translateZ(3px); opacity: .85; }
+.role-avatar__person--front { left: 13px; transform: translateZ(12px); }
+.role-avatar__head { position: absolute; top: 0; left: 8px; width: 24px; height: 25px; border-radius: 50%; background: radial-gradient(circle at 30% 23%,#fff,#e3efff 50%,#94b0df); box-shadow: 2px 3px 3px #1b327542; transform-origin: center bottom; }
+.role-avatar__body { position: absolute; bottom: 0; width: 39px; height: 26px; border-radius: 20px 20px 9px 9px; background: linear-gradient(125deg,#fff,#d3e5ff 50%,#96b4e6); box-shadow: 2px 3px 3px #1b327542; }
+.role-avatar__face { position: absolute; inset: 13px; border-radius: 50%; background: radial-gradient(circle at 30% 23%,#fff4c6,#fbd887 48%,#dfa554); box-shadow: inset -3px -4px 5px #c7874540, 3px 6px 5px #146b8040; transform: translateZ(12px); }
+.role-avatar__eye { position: absolute; top: 21px; width: 5px; height: 7px; border-radius: 50%; background: #4b473e; }
+.role-avatar__eye--left { left: 14px; }.role-avatar__eye--right { right: 14px; }
+.role-avatar__smile { position: absolute; left: 21px; top: 31px; width: 13px; height: 8px; border: 2px solid #83533e; border-top: 0; border-radius: 0 0 12px 12px; }
+.role-avatar__cheek { position: absolute; top: 30px; width: 9px; height: 5px; border-radius: 50%; background: #ef9d79a1; }.role-avatar__cheek--left { left: 7px; }.role-avatar__cheek--right { right: 7px; }
+.role-avatar__curl { position: absolute; width: 15px; height: 13px; top: -2px; left: 19px; border: 3px solid #a9743d; border-top-color: transparent; border-left-color: transparent; border-radius: 50%; transform: rotate(20deg); }
+.role-card:is(:hover,:focus-visible):not(:disabled) .role-avatar--parent .role-avatar__model { animation: role-welcome .85s ease both; }
+.role-card:is(:hover,:focus-visible):not(:disabled) .role-avatar__head { animation: role-nod .85s ease both; }
+.role-card:is(:hover,:focus-visible):not(:disabled) .role-avatar--child .role-avatar__model { animation: role-bounce .8s ease both; }
+.role-card:is(:hover,:focus-visible):not(:disabled) .role-avatar__eye--right { animation: role-wink .8s ease both; }
+.role-card:is(:hover,:focus-visible):not(:disabled) .role-avatar__smile { transform: scale(1.15); transition: transform .2s; }
+.role-card[aria-busy="true"] .role-avatar__model { transform: translateY(-5px); transition: transform .25s ease; }
+.role-card[aria-busy="true"] { opacity: 1; }
+.role-card[data-in-flight="true"] > .role-avatar { visibility: hidden; }
+.role-flight { position: fixed; z-index: 10000; pointer-events: none; transform-origin: top left; }
+.role-flight .role-avatar { width: 80px; height: 80px; }
+.dashboard-welcome { position: relative; isolation: isolate; overflow: hidden; min-height: 132px; padding: 24px; border: 1px solid #dbe7f1; border-radius: 22px; background: linear-gradient(115deg,#fff,#eaf1ff); }
+.dashboard-welcome--child { background: linear-gradient(115deg,#fff,#e2f6f6); }
+.dashboard-welcome > :not(.dashboard-role-art) { position: relative; z-index: 1; }
+.dashboard-role-art { position: absolute; right: 6%; top: 0; width: 160px; height: 160px; opacity: .14; pointer-events: none; z-index: 0; }
+.dashboard-role-art .role-avatar { transform: scale(2); transform-origin: top left; }
+.dashboard-role-art.is-arriving { opacity: 0; }
+@keyframes role-welcome { 0%,100% { transform: rotateY(0) rotateZ(0); } 40% { transform: rotateY(-16deg) rotateZ(-5deg); } 70% { transform: rotateY(10deg) rotateZ(3deg); } }
+@keyframes role-nod { 0%,100% { transform: rotateX(0); } 45% { transform: rotateX(28deg) translateY(3px); } }
+@keyframes role-bounce { 0%,100% { transform: translateY(0) rotateZ(0); } 40% { transform: translateY(-11px) rotateZ(-8deg); } 70% { transform: translateY(2px) rotateZ(4deg); } }
+@keyframes role-wink { 0%,25%,80%,100% { transform: scaleY(1); } 40%,65% { transform: scaleY(.15); } }
+@media (prefers-reduced-motion: reduce) { .role-card .role-avatar, .role-card .role-avatar * { animation: none !important; transition: none !important; transform: none !important; } }

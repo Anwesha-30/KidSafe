@@ -1,0 +1,69 @@
+.kidsafe-hero {
+  background: radial-gradient(ellipse at 80% 40%, #174888 0%, transparent 55%), linear-gradient(120deg, #0c1834, #102c59);
+  overflow: hidden;
+}
+.kidsafe-hero__layout { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 24px; max-width: 1152px; margin: auto; padding: 40px 24px; }
+.kidsafe-hero__copy { position: relative; z-index: 1; }
+.kidsafe-hero__eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; color: #9cebdc; font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; }
+.kidsafe-hero__eyebrow::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #78e9ca; box-shadow: 0 0 16px #78e9ca; }
+.kidsafe-hero__copy h1 { font-size: clamp(36px, 4.5vw, 56px); line-height: 1.08; letter-spacing: -.04em; }
+.kidsafe-hero__cta { display: inline-flex; align-items: center; gap: 12px; margin-top: 24px; padding: 12px 19px; border-radius: 12px; background: #b0f5df; color: #102c35; font-size: 14px; font-weight: 700; transition: background .2s; }
+.kidsafe-hero__cta:hover { background: #d2ffed; }
+.allowance-scene { position: relative; height: 420px; min-width: 0; }
+.allowance-scene__art { position: absolute; inset: 0; perspective: 850px; }
+.allowance-scene__halo { position: absolute; inset: 4% -5%; border-radius: 50%; background: radial-gradient(ellipse, #35cec52b, #4c8ef018 45%, transparent 70%); }
+.allowance-scene__floor { position: absolute; width: 220px; height: 34px; left: calc(50% - 110px); top: 83%; border-radius: 50%; background: #030e28; filter: blur(16px); opacity: .6; }
+.allowance-scene__stage { position: absolute; left: 50%; top: 46%; width: 0; height: 0; transform-style: preserve-3d; transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)); transition: transform .25s ease-out; }
+.allowance-scene__orbit-plane { position: absolute; transform-style: preserve-3d; transform: rotateX(65deg) rotateZ(-16deg); }
+.allowance-scene__ring { position: absolute; width: 360px; height: 360px; left: -180px; top: -180px; border: 1px solid #9cd5fb55; border-radius: 50%; box-shadow: 0 0 20px #62c0ff0d, inset 0 0 20px #62c0ff0d; }
+.allowance-scene__orbit { position: absolute; transform-style: preserve-3d; animation: ks-orbit 18s linear infinite; animation-delay: var(--phase); }
+.allowance-scene__coin-position { position: absolute; transform-style: preserve-3d; transform: translateX(180px); }
+.allowance-scene__coin { position: absolute; width: 55px; height: 55px; left: -27px; top: -27px; transform-style: preserve-3d; animation: ks-counter-orbit 18s linear infinite; animation-delay: var(--phase); }
+.allowance-scene__coin-layer { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; background: #a86816; border: 2px solid #d89c35; font: 700 30px Georgia, serif; color: #a96517; }
+.allowance-scene__coin-layer:last-child { background: linear-gradient(130deg, #fff1a7, #ffd464 48%, #e8a32b); border: 3px solid #ffe193; box-shadow: inset 0 0 0 3px #d9942866; text-shadow: 0 1px #fff4b5; }
+.allowance-scene__badge { position: absolute; top: 144px; left: -112px; width: 224px; display: flex; justify-content: center; align-items: center; gap: 9px; padding: 12px; border: 1px solid #94dac52e; border-radius: 14px; color: #b8f7e4; background: #193c59ed; box-shadow: 0 12px 30px #020b242e; font-size: 12px; transform: translateZ(45px); }
+.allowance-scene__spark { position: absolute; width: 4px; height: 4px; background: #b0f5df; border-radius: 50%; box-shadow: 0 0 12px #a3ffe2; animation: ks-spark 4s ease-in-out infinite alternate; }
+.allowance-scene__spark--one { top: 17%; left: 25%; }
+.allowance-scene__spark--two { top: 25%; right: 15%; animation-delay: -2s; }
+.allowance-scene__spark--three { bottom: 25%; left: 14%; animation-delay: -3s; }
+.allowance-scene__pause { position: absolute; bottom: 0; right: 0; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; color: #b7cce4; font-size: 10px; border-radius: 8px; }
+.allowance-scene__pause:hover { background: #ffffff0d; color: white; }
+.allowance-scene__card-float { transform-style: preserve-3d; animation: ks-float 6s ease-in-out infinite; }
+.allowance-scene__card { position: absolute; width: 280px; height: 184px; left: -140px; top: -92px; transform-style: preserve-3d; transform: rotateY(-20deg) rotateX(12deg) rotateZ(-9deg); }
+.allowance-scene__card-layer, .allowance-scene__card-face { position: absolute; inset: 0; border-radius: 22px; }
+.allowance-scene__card-layer { background: linear-gradient(125deg, #bbfce9, #2c948e 45%, #154b65 75%, #87e9d1); border: 1px solid #a6ffe655; }
+.allowance-scene__card-face { transform: translateZ(16px); overflow: hidden; padding: 20px 23px; color: #103e4b; background: radial-gradient(ellipse at 100% 0%, #edfff4, transparent 60%), linear-gradient(125deg, #a1f5d8, #68ced0); box-shadow: inset 0 0 0 1px #e2fff5aa; }
+.allowance-scene__card-face::after { content: ""; position: absolute; inset: -100%; pointer-events: none; background: linear-gradient(110deg, transparent 42%, #ffffff40 49%, transparent 57%); animation: ks-shine 7s ease-in-out infinite; }
+.allowance-scene__card-header { display: flex; justify-content: space-between; align-items: center; }
+.allowance-scene__card-header > span { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 800; letter-spacing: -.04em; }
+.allowance-scene__card-balance { display: flex; flex-direction: column; margin-top: 17px; }
+.allowance-scene__card-balance > span { font-size: 10px; font-weight: 500; }
+.allowance-scene__card-balance strong { font-size: 39px; line-height: 1.15; letter-spacing: -.05em; }
+.allowance-scene__card-balance strong span { font-size: 24px; opacity: .65; }
+.allowance-scene__card-balance small { font-size: 8px; letter-spacing: .04em; }
+.allowance-scene__card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 7px; letter-spacing: .12em; font-weight: 700; }
+.allowance-scene__card-chip { width: 26px; height: 20px; border: 1px solid #b69750; border-radius: 5px; background: repeating-linear-gradient(0deg, transparent 0 6px, #ac944b88 6px 7px), linear-gradient(120deg, #fff0ae, #d3b766); }
+.allowance-scene__seal { position: absolute; right: -20px; top: -27px; width: 70px; height: 76px; display: grid; place-items: center; color: #d2ffee; background: linear-gradient(130deg, #3189aa, #164879); border: 2px solid #6fcee0; border-radius: 23px 23px 30px 30px; box-shadow: 5px 7px 0 #103652, 10px 16px 25px #07314444; transform: translateZ(45px) rotateZ(12deg); }
+.allowance-scene__pause:focus-visible { outline: 2px solid #b0f5df; outline-offset: 3px; }
+.allowance-scene.is-paused *, .allowance-scene.is-paused *::after { animation-play-state: paused !important; }
+@keyframes ks-float { 0%,100% { transform: translateY(-8px); } 50% { transform: translateY(8px); } }
+@keyframes ks-orbit { from { transform: rotateZ(0deg); } to { transform: rotateZ(360deg); } }
+@keyframes ks-counter-orbit { from { transform: rotateZ(16deg) rotateX(-65deg) rotateY(-20deg); } to { transform: rotateZ(-344deg) rotateX(-65deg) rotateY(-20deg); } }
+@keyframes ks-shine { 0%,30% { transform: translateX(-45%); } 70%,100% { transform: translateX(45%); } }
+@keyframes ks-spark { from { opacity: .3; transform: translateY(0); } to { opacity: 1; transform: translateY(-10px); } }
+@media (max-width: 767px) {
+  .kidsafe-hero__layout { grid-template-columns: 1fr; gap: 0; padding-top: 38px; }
+  .kidsafe-hero__copy { text-align: center; }
+  .kidsafe-hero__copy p { margin-inline: auto; }
+  .kidsafe-hero__copy .kidsafe-hero__features { justify-content: center; }
+  .allowance-scene { height: 345px; max-width: 420px; width: 100%; margin: 10px auto 0; }
+  .allowance-scene__stage { transform: scale(.83) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .allowance-scene *, .allowance-scene *::after { animation: none !important; transition: none !important; }
+  .allowance-scene__stage { transform: scale(.83); }
+  .allowance-scene__orbit:nth-child(3) { transform: rotateZ(120deg); }
+  .allowance-scene__orbit:nth-child(4) { transform: rotateZ(240deg); }
+  .allowance-scene__coin { transform: rotateX(-65deg); }
+  .allowance-scene__pause { display: none; }
+}
