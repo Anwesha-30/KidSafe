@@ -1,23 +1,39 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Coins, Wallet, TrendingUp, Bell, Plus,
-  RefreshCw, UserPlus, AlertTriangle, Gauge,
-  ArrowRight, Settings,
+  Copy,
+  Wallet,
+  TrendingUp,
+  Bell,
+  Plus,
+  RefreshCw,
+  UserPlus,
+  ArrowUpRight,
+  CalendarDays,
+  ShieldCheck,
+  Trash2,
+  Users,
+  CheckCircle2,
+  Activity,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
+  Rectangle,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 import Navbar from "@/components/Navbar";
-import { DashboardRoleArt } from "@/components/RoleTransition";
+import { DashboardRoleArt, useRoleTransition } from "@/components/RoleTransition";
+import ParentWelcome from "@/components/ParentWelcome";
 import Sidebar from "@/components/Sidebar";
-import StatCard from "@/components/StatCard";
-import AllowanceCard from "@/components/AllowanceCard";
-import SpendingLimitCard from "@/components/SpendingLimitCard";
-import ChildProfileCard from "@/components/ChildProfileCard";
 import TransactionTable from "@/components/TransactionTable";
 import WhitelistManager from "@/components/WhitelistManager";
 import ApprovalModal from "@/components/ApprovalModal";
@@ -26,412 +42,1833 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { useWallet } from "@/hooks/useWallet";
 import { useKidSafe } from "@/hooks/useKidSafe";
 import { useAllowance } from "@/hooks/useAllowance";
-import { formatToken, toHuman } from "@/utils/formatCurrency";
-import { shortenAddress } from "@/utils/formatAddress";
-import { MOCK_CHILD_ADDRESS, MOCK_WEEKLY_SPENDING } from "@/services/mockData";
 
-// ── Spending breakdown demo data ────────────────────────
-const BREAKDOWN_DEMO = [
-  { name: "Entertainment", value: 12, color: "#10b981" },
-  { name: "Food",          value: 2,  color: "#3b82f6" },
-  { name: "Income",        value: 5,  color: "#ec4899" },
-  { name: "Other",         value: 19, color: "#8b5cf6" },
-  { name: "Savings",       value: 8,  color: "#ef4444" },
-  { name: "Utilities",     value: 53, color: "#f59e0b" },
+import {
+  formatToken,
+  toHuman,
+  toRaw,
+  dailyResetCountdown,
+} from "@/utils/formatCurrency";
+
+import {
+  shortenAddress,
+  isValidAddress,
+} from "@/utils/formatAddress";
+
+import {
+  CHAIN_CONFIG,
+  SUPPORTED_CHAIN_ID,
+  KIDSAFE_ADDRESS,
+  TOKEN_SYMBOL,
+} from "@/utils/constants";
+
+import { MOCK_CHILD_ADDRESS } from "@/services/mockData";
+
+import "./ParentDashboard.css";
+
+import {
+  AnimatedNumber,
+  useCardTilt,
+  useReducedMotion,
+} from "./ParentDashboardMotion";
+
+import {
+  ProtectionScene,
+  LiquidGauge,
+  DecisionFeedback,
+} from "./ParentDashboardVisuals";
+
+const COLORS = [
+  "#4f46e5",
+  "#14b8a6",
+  "#60a5fa",
+  "#f59e0b",
+  "#a78bfa",
 ];
 
-// ── Legend rendered below the donut ────────────────────
-function BreakdownLegend({ data }) {
+const money = (value) => formatToken(toRaw(value));
+
+function Summary({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  primary = false,
+  loading,
+  numericValue = null,
+  status,
+}) {
+  const tilt = useCardTilt();
+
   return (
-    <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-4">
-      {data.map((entry) => (
-        <span key={entry.name} className="flex items-center gap-1.5 text-xs text-gray-500">
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
-          <span className="font-semibold text-gray-700">{entry.value}%</span> {entry.name}
+    <div
+      {...tilt}
+      className={`pd-summary ${
+        primary ? "pd-summary-primary" : ""
+      }`}
+    >
+      <div className="pd-summary-label">
+        <span>{label}</span>
+        <Icon size={19} aria-hidden />
+      </div>
+
+      <p className="pd-summary-value">
+        {loading ? (
+          <span className="pd-skeleton" />
+        ) : numericValue !== null ? (
+          <AnimatedNumber
+            value={numericValue}
+            format={money}
+          />
+        ) : status ? (
+          <span
+            className="pd-status"
+            data-status={status}
+          >
+            <i aria-hidden="true" />
+            {value}
+          </span>
+        ) : (
+          value
+        )}
+      </p>
+
+      <p className="pd-summary-detail">
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+function Limit({
+  label,
+  spent,
+  limit,
+  detail,
+  loading,
+  monthly = false,
+  available = true,
+}) {
+  const pct =
+    limit > 0
+      ? Math.min(
+          100,
+          Math.max(0, (spent / limit) * 100)
+        )
+      : 0;
+
+  return (
+    <div
+      className={`pd-limit ${
+        monthly ? "pd-limit-monthly" : ""
+      }`}
+    >
+      <div className="pd-between">
+        <span className="pd-limit-label">
+          {label}
         </span>
-      ))}
+
+        <span className="pd-muted">
+          {limit > 0
+            ? `${Math.round(pct)}% used`
+            : "Not set"}
+        </span>
+      </div>
+
+      <p className="pd-limit-amount">
+        {loading ? "Loading…" : money(spent)}{" "}
+        <span>
+          / {limit > 0 ? money(limit) : "—"}
+        </span>
+      </p>
+
+      <LiquidGauge
+        spent={spent}
+        limit={limit}
+        available={available && !loading}
+        label={label}
+      />
+
+      <div className="pd-between pd-limit-footer">
+        <span>{detail}</span>
+
+        <strong>
+          {limit > 0
+            ? `${money(
+                Math.max(0, limit - spent)
+              )} left`
+            : "Set a limit to track usage"}
+        </strong>
+      </div>
     </div>
   );
 }
 
-// ── Custom donut tooltip ────────────────────────────────
-function DonutTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0];
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-md text-xs">
-      <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: d.payload.color }} />
-      <span className="font-semibold text-gray-800">{d.name}</span>
-      <span className="ml-2 text-gray-500">{d.value}%</span>
-    </div>
+// Aggregate only successful payment events returned by the existing hook.
+function paymentData(transactions) {
+  const now = new Date();
+
+  const days = Array.from(
+    {
+      length: 7,
+    },
+    (_, i) => {
+      const date = new Date(now);
+
+      date.setDate(
+        date.getDate() - 6 + i
+      );
+
+      date.setHours(0, 0, 0, 0);
+
+      return {
+        day: date.toLocaleDateString(
+          undefined,
+          {
+            weekday: "short",
+          }
+        ),
+        date: date.getTime(),
+        end: new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate() + 1
+        ).getTime(),
+        amount: 0,
+      };
+    }
   );
-}
 
-// ────────────────────────────────────────────────────────
-export default function ParentDashboard() {
-  const navigate = useNavigate();
-  const { account, isDemoMode } = useWallet();
-  const { registerChild, loading: txLoading } = useKidSafe();
+  const groups = {};
+  let monthlySpent = 0;
 
-  const [childAddress,     setChildAddress]     = useState(isDemoMode ? MOCK_CHILD_ADDRESS : "");
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
-  const [newChildInput,    setNewChildInput]    = useState("");
-  const [sidebarOpen,      setSidebarOpen]      = useState(false);
-  const [approvalTarget,   setApprovalTarget]   = useState(null);
+  for (const tx of transactions) {
+    if (tx.status !== "success") continue;
 
-  const {
-    childDetails, approvedRecipients,
-    pendingRequests, transactions,
-    loading, demoMode, refetch,
-  } = useAllowance(childAddress || (isDemoMode ? MOCK_CHILD_ADDRESS : null));
+    const date = new Date(
+      Number(tx.timestamp) * 1000
+    );
 
-  const chartData      = demoMode ? MOCK_WEEKLY_SPENDING : buildChartData(transactions);
-  const breakdownData  = demoMode ? BREAKDOWN_DEMO       : buildBreakdown(transactions);
-  const totalAllocated = childDetails?.allowanceBalance ?? 0n;
-  const dailySpent     = childDetails?.dailySpent ?? 0n;
+    if (date > now) continue;
 
-  async function handleRegisterChild(e) {
-    e.preventDefault();
-    await registerChild(newChildInput, () => {
-      setChildAddress(newChildInput.toLowerCase());
-      setShowRegisterForm(false);
-      setNewChildInput("");
-    });
+    const amount = toHuman(tx.amount);
+
+    if (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    ) {
+      monthlySpent += amount;
+    }
+
+    const bucket = days.find(
+      (d) =>
+        date.getTime() >= d.date &&
+        date.getTime() < d.end
+    );
+
+    if (bucket) {
+      bucket.amount += amount;
+    }
+
+    const name =
+      tx.label ||
+      tx.type ||
+      "Other payments";
+
+    groups[name] =
+      (groups[name] || 0) + amount;
   }
 
+  return {
+    days,
+    monthlySpent,
+    breakdown: Object.entries(groups).map(
+      ([name, value], i) => ({
+        name,
+        value,
+        color:
+          COLORS[i % COLORS.length],
+      })
+    ),
+  };
+}
+
+export default function ParentDashboard() {
+  const [showWelcome, setShowWelcome] = useState(true);
+  const { cancel } = useRoleTransition();
+  useEffect(() => {
+    if (showWelcome) {
+      cancel();
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, [showWelcome, cancel]);
+  const navigate = useNavigate();
+
+  const reducedMotion =
+    useReducedMotion();
+
+  const {
+    account,
+    isDemoMode,
+    isCorrectChain,
+  } = useWallet();
+
+  const {
+    registerChild,
+    addApprovedRecipient,
+    loading: txLoading,
+  } = useKidSafe();
+
+  const [childAddress, setChildAddress] =
+    useState("");
+
+  const selectedChild =
+    childAddress ||
+    (isDemoMode
+      ? MOCK_CHILD_ADDRESS
+      : "");
+
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
+
+  const [
+    showRegisterForm,
+    setShowRegisterForm,
+  ] = useState(false);
+
+  const [
+    newChildInput,
+    setNewChildInput,
+  ] = useState("");
+
+  const [childName, setChildName] =
+    useState("");
+
+  const [
+    monthlyBudget,
+    setMonthlyBudget,
+  ] = useState("");
+
+  const [
+    recipientName,
+    setRecipientName,
+  ] = useState("");
+
+  const [
+    recipientAddress,
+    setRecipientAddress,
+  ] = useState("");
+
+  const [
+    namedRecipients,
+    setNamedRecipients,
+  ] = useState({});
+
+  const [formError, setFormError] =
+    useState("");
+
+  const [
+    approvalTarget,
+    setApprovalTarget,
+  ] = useState(null);
+
+  const [decision, setDecision] =
+    useState(null);
+
+  const clearDecision = useCallback(
+    () => setDecision(null),
+    []
+  );
+
+  const {
+    childDetails,
+    approvedRecipients,
+    pendingRequests,
+    transactions,
+    loading,
+    error,
+    demoMode,
+    refetch,
+  } = useAllowance(
+    selectedChild || null
+  );
+
+  const {
+    days,
+    monthlySpent,
+    breakdown,
+  } = useMemo(
+    () => paymentData(transactions),
+    [transactions]
+  );
+
+  const budget =
+    Number(monthlyBudget) || 0;
+
+  const dailyLimit = toHuman(
+    childDetails?.dailyLimit ?? 0n
+  );
+
+  const dailySpent = toHuman(
+    childDetails?.dailySpent ?? 0n
+  );
+
+  const ready =
+    !!childDetails && !error;
+
+  const status = error
+    ? "Unavailable"
+    : loading && !childDetails
+    ? "Loading"
+    : childDetails?.registered
+    ? "Active"
+    : "Not registered";
+
+  const names =
+    namedRecipients[
+      selectedChild.toLowerCase()
+    ] || {};
+
+  const canManage =
+    !!selectedChild &&
+    !!childDetails?.registered &&
+    (isDemoMode ||
+      (!!account &&
+        isCorrectChain &&
+        childDetails.parent
+          ?.toLowerCase() ===
+          account.toLowerCase()));
+
+  const network =
+    CHAIN_CONFIG[SUPPORTED_CHAIN_ID];
+
+  async function handleRegister(e) {
+    e.preventDefault();
+
+    if (!isValidAddress(newChildInput)) {
+      setFormError(
+        "Enter a valid child wallet address."
+      );
+      return;
+    }
+
+    setFormError("");
+
+    await registerChild(
+      newChildInput,
+      () => {
+        setChildAddress(
+          newChildInput.toLowerCase()
+        );
+
+        setNewChildInput("");
+        setShowRegisterForm(false);
+      }
+    );
+  }
+
+  async function handleNamedRecipient(e) {
+    e.preventDefault();
+
+    if (!isValidAddress(recipientAddress)) {
+      setFormError(
+        "Enter a valid dApp contract address."
+      );
+      return;
+    }
+
+    const address =
+      recipientAddress.toLowerCase();
+
+    const saveName = () => {
+      setNamedRecipients((prev) => ({
+        ...prev,
+        [selectedChild.toLowerCase()]: {
+          ...prev[
+            selectedChild.toLowerCase()
+          ],
+          [address]:
+            recipientName.trim(),
+        },
+      }));
+
+      setRecipientName("");
+      setRecipientAddress("");
+      setFormError("");
+
+      refetch();
+    };
+
+    if (
+      approvedRecipients.some(
+        (a) =>
+          a.toLowerCase() === address
+      )
+    ) {
+      saveName();
+    } else {
+      await addApprovedRecipient(
+        selectedChild,
+        address,
+        saveName
+      );
+    }
+  }
+
+  if (showWelcome) return <ParentWelcome onEnter={() => setShowWelcome(false)} demoMode={demoMode ?? isDemoMode} />;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar onMenuToggle={() => setSidebarOpen((o) => !o)} sidebarOpen={sidebarOpen} />
+    <div className="parent-dashboard min-h-screen">
+      <div
+        className="pd-ambient"
+        aria-hidden="true"
+      >
+        <span className="pd-floating-shield">
+          <ShieldCheck
+            size={76}
+            strokeWidth={0.8}
+          />
+        </span>
+
+        <span className="pd-floating-block">
+          <svg
+            width="88"
+            height="88"
+            viewBox="0 0 88 88"
+            fill="none"
+          >
+            <path
+              d="M44 8 76 26v36L44 80 12 62V26L44 8ZM12 26l32 18 32-18M44 44v36"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+          </svg>
+        </span>
+
+        <span className="pd-floating-link">
+          <Activity
+            size={64}
+            strokeWidth={0.8}
+          />
+        </span>
+      </div>
+
+      <Navbar
+        onMenuToggle={() =>
+          setSidebarOpen((v) => !v)
+        }
+        sidebarOpen={sidebarOpen}
+      />
 
       <div className="flex">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} mode="parent" />
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() =>
+            setSidebarOpen(false)
+          }
+          mode="parent"
+        />
 
-        <main className="flex-1 min-w-0 p-4 md:p-6 lg:p-8">
-
-          {/* ── Page header ──────────────────────────────────── */}
-          <div className="dashboard-welcome flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <main className="pd-main">
+          {/* =========================
+              FAMILY COMMAND CENTER HEADER
+             ========================= */}
+          <header className="pd-header">
             <DashboardRoleArt role="parent" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
-              <p className="text-sm text-gray-400 mt-0.5">
-                {demoMode ? "Demo Mode — data is simulated." : "Manage your child's allowance and spending."}
+              <p className="pd-eyebrow">
+                YOUR FAMILY. YOUR CONTROL.
+              </p>
+
+              <h1>
+                Family Command Center
+                <span className="pd-header-dot">
+                  .
+                </span>
+              </h1>
+
+              <p className="pd-muted">
+                Manage allowance. Set
+                guardrails. Approve every
+                request.
               </p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={refetch} className="btn-ghost" disabled={loading} aria-label="Refresh">
-                <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
+
+            <div className="pd-header-actions">
+              <button type="button" className="btn-ghost" onClick={() => setShowWelcome(true)}>Replay intro</button>
+              <button
+                className="btn-ghost"
+                onClick={refetch}
+                disabled={loading}
+                aria-label="Refresh dashboard"
+              >
+                <RefreshCw
+                  size={16}
+                  className={
+                    loading
+                      ? "animate-spin"
+                      : ""
+                  }
+                />
+                Refresh
               </button>
-              <button onClick={() => navigate("/parent/allowance")} className="btn-secondary">
-                <Coins size={15} /> Set Allowance
-              </button>
-              <button onClick={() => navigate("/parent/settings")} className="btn-primary">
-                <Gauge size={15} /> Set Daily Limit
+
+              <button
+                className="btn-primary"
+                onClick={() =>
+                  navigate(
+                    "/parent/allowance"
+                  )
+                }
+              >
+                <Plus size={16} />
+                Manage allowance
               </button>
             </div>
+          </header>
+
+          <ProtectionScene
+            spent={dailySpent}
+            limit={dailyLimit}
+            available={ready}
+          />
+
+          <div className="pd-context">
+            <span className="pd-context-label">
+              <span
+                className={`pd-dot ${
+                  demoMode || error
+                    ? "pd-dot-amber"
+                    : ""
+                }`}
+              />
+
+              {demoMode
+                ? "Demo workspace · simulated data"
+                : error
+                ? "Blockchain data unavailable"
+                : loading
+                ? "Refreshing blockchain data"
+                : selectedChild
+                ? "Blockchain data · auto-refresh enabled"
+                : "Connect a child wallet to get started"}
+            </span>
+
+            <span>
+              {demoMode
+                ? "Preview"
+                : network?.name ||
+                  "Configured network"}{" "}
+              · {TOKEN_SYMBOL}
+            </span>
           </div>
 
-          {/* ── Demo banner ──────────────────────────────────── */}
-          {demoMode && (
-            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-6 text-sm text-amber-800">
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-amber-500" />
+          {error && (
+            <div
+              className="pd-notice"
+              role="alert"
+            >
+              Unable to refresh blockchain
+              data. Previously loaded values
+              may be stale. {error}
+
+              <button
+                onClick={refetch}
+                className="btn-ghost"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!selectedChild && (
+            <section className="card pd-onboarding">
+              <UserPlus size={28} />
+
               <div>
-                <p className="font-semibold mb-0.5">Demo Mode Active</p>
-                <p className="text-amber-700">
-                  Data shown is simulated. Deploy contracts and configure{" "}
-                  <code className="bg-amber-100 px-1 rounded">frontend/.env</code> to go live.
+                <h2>
+                  Start with a child wallet
+                </h2>
+
+                <p className="pd-muted">
+                  Register a new wallet or
+                  load one you already manage.
                 </p>
               </div>
-            </div>
+
+              <button
+                className="btn-primary"
+                onClick={() =>
+                  setShowRegisterForm(
+                    (v) => !v
+                  )
+                }
+              >
+                Register child
+              </button>
+            </section>
           )}
 
-          {/* ── Register child prompt ─────────────────────────── */}
-          {!childAddress && !isDemoMode && (
-            <div className="card text-center py-12 mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
-                <UserPlus size={24} className="text-brand-light" />
-              </div>
-              <h3 className="font-semibold text-gray-700 mb-1">No child registered yet</h3>
-              <p className="text-gray-400 text-sm mb-5">Link a child wallet address to get started.</p>
-              {showRegisterForm ? (
-                <form onSubmit={handleRegisterChild} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
-                  <input
-                    type="text" value={newChildInput}
-                    onChange={(e) => setNewChildInput(e.target.value)}
-                    placeholder="Child wallet address (0x…)"
-                    className="input font-mono text-xs flex-1" required
-                  />
-                  <button type="submit" className="btn-primary" disabled={txLoading.registerChild}>
-                    {txLoading.registerChild ? <LoadingSpinner size="sm" /> : <Plus size={15} />} Register
-                  </button>
-                </form>
-              ) : (
-                <button onClick={() => setShowRegisterForm(true)} className="btn-primary mx-auto">
-                  <UserPlus size={15} /> Register Child Wallet
-                </button>
-              )}
-            </div>
+          {showRegisterForm && (
+            <form
+              onSubmit={handleRegister}
+              className="card pd-wallet-form"
+            >
+              <label
+                className="input-label"
+                htmlFor="register-child"
+              >
+                Child wallet address
+              </label>
+
+              <input
+                id="register-child"
+                className="input font-mono"
+                value={newChildInput}
+                onChange={(e) =>
+                  setNewChildInput(
+                    e.target.value
+                  )
+                }
+                placeholder="0x…"
+                required
+              />
+
+              <button
+                className="btn-primary"
+                disabled={
+                  txLoading.registerChild ||
+                  (!isDemoMode &&
+                    (!account ||
+                      !isCorrectChain))
+                }
+              >
+                {txLoading.registerChild ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <Plus size={16} />
+                )}
+
+                Register
+              </button>
+            </form>
           )}
 
-          {/* ── Stats row ────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              title="Total Allowance"
-              value={formatToken(totalAllocated)}
-              subtitle="Allocated to child"
-              icon={<Coins size={20} />}
-              iconBg="bg-blue-50" iconColor="text-brand-light"
-              loading={loading}
+          {formError && (
+            <p
+              className="pd-notice"
+              role="alert"
+            >
+              {formError}
+            </p>
+          )}
+
+          {/* SUMMARY */}
+          <section
+            className="pd-summary-grid"
+            aria-label="Allowance overview"
+          >
+            <Summary
+              key={`allowance-${selectedChild}`}
+              numericValue={
+                ready
+                  ? toHuman(
+                      childDetails.allowanceBalance
+                    )
+                  : null
+              }
+              label="Available Allowance"
+              value={
+                ready
+                  ? formatToken(
+                      childDetails.allowanceBalance
+                    )
+                  : "—"
+              }
+              detail="Current allowance balance"
+              icon={Wallet}
+              primary
+              loading={
+                loading && !childDetails
+              }
             />
-            <StatCard
-              title="Remaining Balance"
-              value={formatToken(childDetails?.allowanceBalance ?? 0n)}
-              subtitle="Available to spend"
-              icon={<Wallet size={20} />}
-              iconBg="bg-emerald-50" iconColor="text-emerald-600"
-              loading={loading}
+
+            <Summary
+              key={`monthly-${selectedChild}`}
+              numericValue={
+                budget && ready
+                  ? Math.max(
+                      0,
+                      budget - monthlySpent
+                    )
+                  : null
+              }
+              label="Monthly Remaining"
+              value={
+                budget && ready
+                  ? money(
+                      Math.max(
+                        0,
+                        budget -
+                          monthlySpent
+                      )
+                    )
+                  : "—"
+              }
+              detail={
+                budget
+                  ? "Against your planning budget"
+                  : "Set a monthly planning budget below"
+              }
+              icon={CalendarDays}
+              loading={
+                loading && !childDetails
+              }
             />
-            <StatCard
-              title="Today's Spending"
-              value={formatToken(dailySpent)}
-              subtitle={`Limit: ${formatToken(childDetails?.dailyLimit ?? 0n)}`}
-              icon={<TrendingUp size={20} />}
-              iconBg="bg-amber-50" iconColor="text-amber-600"
-              loading={loading}
+
+            <Summary
+              key={`daily-${selectedChild}`}
+              numericValue={
+                ready ? dailySpent : null
+              }
+              label="Today's Spending"
+              value={
+                ready
+                  ? formatToken(
+                      childDetails.dailySpent
+                    )
+                  : "—"
+              }
+              detail={
+                ready
+                  ? `Daily limit ${money(
+                      dailyLimit
+                    )}`
+                  : "Waiting for child wallet data"
+              }
+              icon={TrendingUp}
+              loading={
+                loading && !childDetails
+              }
             />
-            <StatCard
-              title="Pending Requests"
-              value={String(pendingRequests.length)}
-              subtitle={pendingRequests.length > 0 ? "Tap to review" : "All clear"}
-              icon={<Bell size={20} />}
-              iconBg={pendingRequests.length > 0 ? "bg-red-50" : "bg-gray-50"}
-              iconColor={pendingRequests.length > 0 ? "text-red-500" : "text-gray-400"}
-              loading={loading}
+
+            <Summary
+              status={status}
+              label="Child Status"
+              value={status}
+              detail={
+                childDetails?.registered
+                  ? "Registered on the KidSafe contract"
+                  : "Register or load a child wallet"
+              }
+              icon={Users}
+              loading={
+                loading && !childDetails
+              }
             />
-          </div>
+          </section>
 
-          {/* ── Main grid ────────────────────────────────────── */}
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="pd-workspace">
+            <div className="pd-primary-column">
+              {/* SPENDING GUARDRAILS */}
+              <section className="card">
+                <div className="pd-section-header">
+                  <div>
+                    <p className="pd-eyebrow">
+                      SPENDING GUARDRAILS
+                    </p>
 
-            {/* Left column */}
-            <div className="lg:col-span-2 space-y-6">
-
-              {/* Weekly spending bar chart */}
-              <div className="card">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="section-title">Weekly Spending</h3>
-                  {demoMode && <span className="badge-info text-xs">Demo data</span>}
-                </div>
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={chartData} barSize={28}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 12, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
-                    <Tooltip formatter={(v) => [`$${v}`, "Spent"]} contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 13 }} />
-                    <Bar dataKey="amount" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* ══════ Spending Breakdown donut chart ══════ */}
-              <div className="card">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp size={16} className="text-emerald-500" />
-                  <h3 className="section-title">Spending Breakdown</h3>
-                  {demoMode && <span className="badge-info text-xs ml-auto">Demo data</span>}
-                </div>
-                <p className="text-xs text-gray-400 mb-3">Category breakdown of child's spending</p>
-
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={breakdownData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={58}
-                      outerRadius={92}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {breakdownData.map((entry, i) => (
-                        <Cell key={`cell-${i}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<DonutTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-
-                <BreakdownLegend data={breakdownData} />
-              </div>
-
-              {/* Allowance + limit cards */}
-              <div className="grid sm:grid-cols-2 gap-6">
-                <AllowanceCard
-                  balance={childDetails?.allowanceBalance ?? 0n}
-                  total={totalAllocated}
-                  loading={loading}
-                />
-                <SpendingLimitCard
-                  dailyLimit={childDetails?.dailyLimit ?? 0n}
-                  dailySpent={childDetails?.dailySpent ?? 0n}
-                  loading={loading}
-                />
-              </div>
-
-              {/* Quick action tiles */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <button onClick={() => navigate("/parent/allowance")} className="card p-4 flex flex-col items-start gap-2 hover:shadow-card-hover transition-shadow cursor-pointer border-2 border-transparent hover:border-brand/10 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><Coins size={17} className="text-brand-light" /></div>
-                  <p className="text-sm font-semibold text-gray-800">Set Allowance</p>
-                  <p className="text-xs text-gray-400">Deposit mUSDC</p>
-                </button>
-                <button onClick={() => navigate("/parent/settings")} className="card p-4 flex flex-col items-start gap-2 hover:shadow-card-hover transition-shadow cursor-pointer border-2 border-transparent hover:border-brand/10 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center"><Gauge size={17} className="text-cyan-600" /></div>
-                  <p className="text-sm font-semibold text-gray-800">Set Daily Limit</p>
-                  <p className="text-xs text-gray-400">Configure cap</p>
-                </button>
-                <button onClick={() => navigate("/parent/transactions")} className="card p-4 flex flex-col items-start gap-2 hover:shadow-card-hover transition-shadow cursor-pointer border-2 border-transparent hover:border-brand/10 text-left">
-                  <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center"><ArrowRight size={17} className="text-purple-500" /></div>
-                  <p className="text-sm font-semibold text-gray-800">All Transactions</p>
-                  <p className="text-xs text-gray-400">Full history</p>
-                </button>
-              </div>
-
-              {/* Recent transactions */}
-              <TransactionTable
-                transactions={transactions.slice(0, 10)}
-                loading={loading}
-                demoMode={demoMode}
-                title="Recent Transactions"
-              />
-            </div>
-
-            {/* Right column */}
-            <div className="space-y-6">
-
-              {/* Child profile */}
-              <ChildProfileCard
-                childAddress={childAddress || (isDemoMode ? MOCK_CHILD_ADDRESS : "")}
-                childDetails={childDetails}
-                loading={loading}
-              />
-
-              {/* Pending requests */}
-              <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Bell size={16} className="text-brand-light" />
-                    <h3 className="section-title">Pending Requests</h3>
+                    <h2>
+                      Small limits. Big peace
+                      of mind.
+                    </h2>
                   </div>
-                  {pendingRequests.length > 0 && <span className="badge-pending">{pendingRequests.length}</span>}
+
+                  <button
+                    className="pd-text-button"
+                    onClick={() =>
+                      navigate(
+                        "/parent/settings"
+                      )
+                    }
+                  >
+                    Edit daily limit
+                    <ArrowUpRight
+                      size={15}
+                    />
+                  </button>
                 </div>
 
-                {loading ? (
-                  <div className="flex justify-center py-6"><LoadingSpinner size="md" /></div>
-                ) : pendingRequests.length === 0 ? (
-                  <div className="empty-state py-8">
-                    <Bell size={28} className="text-gray-200 mb-2" />
-                    <p className="text-gray-400 text-sm font-medium">No pending requests</p>
-                    <p className="text-gray-300 text-xs mt-1">Child requests appear here for approval.</p>
+                <div className="pd-limits-grid">
+                  <Limit
+                    available={ready}
+                    label="Daily spending limit"
+                    spent={dailySpent}
+                    limit={dailyLimit}
+                    loading={
+                      loading &&
+                      !childDetails
+                    }
+                    detail={`Resets ${dailyResetCountdown()}`}
+                  />
+
+                  <Limit
+                    available={ready}
+                    label="Monthly planning budget"
+                    spent={monthlySpent}
+                    limit={budget}
+                    monthly
+                    loading={
+                      loading &&
+                      !childDetails
+                    }
+                    detail="Based on loaded payment history"
+                  />
+                </div>
+
+                <p className="pd-footnote">
+                  Daily limits are enforced
+                  on-chain. Monthly budgets are
+                  planning targets; history
+                  covers the latest 10,000
+                  blocks.
+                </p>
+              </section>
+
+              {/* CHILD MANAGEMENT */}
+              <section className="card">
+                <div className="pd-section-header">
+                  <div>
+                    <p className="pd-eyebrow">
+                      FAMILY WALLET
+                    </p>
+
+                    <h2>
+                      Child Management
+                    </h2>
+                  </div>
+
+                  <span
+                    data-status={status}
+                    className={`pd-status-badge ${
+                      childDetails?.registered
+                        ? "badge-success"
+                        : "badge-info"
+                    }`}
+                  >
+                    <CheckCircle2 size={12} />
+                    {status}
+                  </span>
+                </div>
+
+                <div className="pd-child-identity">
+                  <div className="pd-avatar">
+                    {(childName ||
+                      "Child")
+                      .slice(0, 1)
+                      .toUpperCase()}
+                  </div>
+
+                  <div>
+                    <h3>
+                      {childName ||
+                        "Child wallet"}
+                    </h3>
+
+                    <p
+                      className="pd-wallet-address"
+                      title={selectedChild}
+                    >
+                      {selectedChild
+                        ? shortenAddress(
+                            selectedChild,
+                            8
+                          )
+                        : "No wallet selected"}
+                    </p>
+                  </div>
+
+                  <button
+                    className="btn-ghost"
+                    aria-label="Copy child wallet address"
+                    disabled={!selectedChild}
+                    onClick={() =>
+                      globalThis.navigator.clipboard
+                        .writeText(
+                          selectedChild
+                        )
+                        .catch(() =>
+                          setFormError(
+                            "Unable to copy the address. Please copy it from the wallet address field."
+                          )
+                        )
+                    }
+                  >
+                    <Copy size={15} />
+                  </button>
+
+                  <span className="pd-muted">
+                    {
+                      approvedRecipients.length
+                    }{" "}
+                    approved dApps
+                  </span>
+                </div>
+
+                <div className="pd-management-grid">
+                  <label className="pd-field">
+                    Display name
+
+                    <input
+                      className="input"
+                      value={childName}
+                      onChange={(e) =>
+                        setChildName(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Give this wallet a name"
+                    />
+
+                    <small>
+                      Display label for this
+                      session
+                    </small>
+                  </label>
+
+                  <label className="pd-field">
+                    Monthly planning budget (
+                    {TOKEN_SYMBOL})
+
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={monthlyBudget}
+                      onChange={(e) =>
+                        setMonthlyBudget(
+                          e.target.value
+                        )
+                      }
+                      placeholder="Enter a budget"
+                    />
+
+                    <small>
+                      Planning only · does not
+                      change the allowance
+                    </small>
+                  </label>
+                </div>
+
+                <details className="pd-wallet-details">
+                  <summary>
+                    Load an existing child
+                    wallet
+                  </summary>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+
+                      if (
+                        isValidAddress(
+                          newChildInput
+                        )
+                      ) {
+                        setChildAddress(
+                          newChildInput.toLowerCase()
+                        );
+
+                        setChildName("");
+                        setMonthlyBudget("");
+                        setFormError("");
+                      } else {
+                        setFormError(
+                          "Enter a valid child wallet address."
+                        );
+                      }
+                    }}
+                    className="pd-wallet-form"
+                  >
+                    <input
+                      className="input font-mono"
+                      aria-label="Existing child wallet address"
+                      value={newChildInput}
+                      onChange={(e) =>
+                        setNewChildInput(
+                          e.target.value
+                        )
+                      }
+                      placeholder="0x…"
+                      required
+                    />
+
+                    <button className="btn-secondary">
+                      Load wallet
+                    </button>
+                  </form>
+                </details>
+
+                <div className="pd-status-note">
+                  <ShieldCheck size={16} />
+
+                  <p>
+                    {childDetails?.registered
+                      ? "Active · child is registered on-chain."
+                      : "Load a registered wallet to view its status."}{" "}
+                    Spending pause is
+                    unavailable in the current
+                    contract.
+                  </p>
+                </div>
+              </section>
+
+              {/* SPENDING INSIGHTS */}
+              <section className="card">
+                <div className="pd-section-header">
+                  <div>
+                    <p className="pd-eyebrow">
+                      SPENDING INSIGHTS
+                    </p>
+
+                    <h2>
+                      The week at a glance
+                    </h2>
+                  </div>
+
+                  <span className="pd-chip">
+                    Last 7 days
+                  </span>
+                </div>
+
+                <div className="pd-chart-total">
+                  <strong>
+                    <AnimatedNumber
+                      value={days.reduce(
+                        (sum, d) =>
+                          sum + d.amount,
+                        0
+                      )}
+                      format={money}
+                    />
+                  </strong>
+
+                  <span className="pd-muted">
+                    in loaded successful
+                    payments
+                  </span>
+                </div>
+
+                <div className="pd-chart">
+                  <ResponsiveContainer
+                    width="100%"
+                    height={245}
+                  >
+                    <BarChart
+                      data={days}
+                      margin={{
+                        top: 15,
+                        right: 8,
+                        left: 0,
+                        bottom: 0,
+                      }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="pd-bar"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#6366f1"
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#a5b4fc"
+                          />
+                        </linearGradient>
+                      </defs>
+
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="#eef0f5"
+                        strokeDasharray="4 4"
+                      />
+
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#64748b",
+                          fontSize: 12,
+                        }}
+                        dy={8}
+                      />
+
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{
+                          fill: "#94a3b8",
+                          fontSize: 11,
+                        }}
+                        width={48}
+                      />
+
+                      <Tooltip
+                        cursor={{
+                          fill: "#f1f5f9",
+                          radius: 8,
+                        }}
+                        formatter={(value) => [
+                          money(
+                            Number(value)
+                          ),
+                          "Spent",
+                        ]}
+                      />
+
+                      <Bar
+                        isAnimationActive={
+                          !reducedMotion
+                        }
+                        animationDuration={650}
+                        animationEasing="ease-out"
+                        activeBar={
+                          <Rectangle
+                            fill="#4f46e5"
+                            stroke="#c7d2fe"
+                            strokeWidth={2}
+                            radius={[
+                              7,
+                              7,
+                              0,
+                              0,
+                            ]}
+                          />
+                        }
+                        dataKey="amount"
+                        fill="url(#pd-bar)"
+                        radius={[
+                          7,
+                          7,
+                          0,
+                          0,
+                        ]}
+                        maxBarSize={38}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {!transactions.some(
+                  (tx) =>
+                    tx.status ===
+                    "success"
+                ) && (
+                  <p className="pd-footnote">
+                    No successful payments yet.
+                    Activity will appear after a
+                    payment is confirmed.
+                  </p>
+                )}
+              </section>
+
+              {/* SPENDING BREAKDOWN */}
+              <section
+                className="card pd-pie-section"
+                aria-label="Spending breakdown pie chart"
+              >
+                <div className="pd-section-header">
+                  <div>
+                    <p className="pd-eyebrow">
+                      PAYMENT MIX
+                    </p>
+
+                    <h2>
+                      Spending Breakdown
+                    </h2>
+
+                    <p className="pd-muted">
+                      Successful payments in
+                      loaded history
+                    </p>
+                  </div>
+
+                  <span className="pd-chip">
+                    {TOKEN_SYMBOL}
+                  </span>
+                </div>
+
+                <div className="pd-pie-layout">
+                  <div className="pd-pie-visual">
+                    {breakdown.length > 0 ? (
+                      <ResponsiveContainer
+                        width="100%"
+                        height={240}
+                      >
+                        <PieChart>
+                          <Pie
+                            isAnimationActive={
+                              !reducedMotion
+                            }
+                            animationDuration={650}
+                            data={breakdown}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={96}
+                            paddingAngle={2}
+                            dataKey="value"
+                            nameKey="name"
+                            stroke="none"
+                          >
+                            {breakdown.map(
+                              (d) => (
+                                <Cell
+                                  key={d.name}
+                                  fill={d.color}
+                                />
+                              )
+                            )}
+                          </Pie>
+
+                          <Tooltip
+                            formatter={(value) =>
+                              money(
+                                Number(value)
+                              )
+                            }
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div
+                        className="pd-pie-placeholder"
+                        role="status"
+                      >
+                        <div
+                          className="pd-pie-empty-ring"
+                          aria-hidden="true"
+                        />
+
+                        <p>
+                          {loading
+                            ? "Loading spending..."
+                            : "No successful payments yet"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pd-legend">
+                    {breakdown.length > 0 ? (
+                      breakdown.map((d) => (
+                        <div key={d.name}>
+                          <span>
+                            <i
+                              style={{
+                                background:
+                                  d.color,
+                              }}
+                            />
+
+                            {d.name}
+                          </span>
+
+                          <strong>
+                            {money(d.value)}
+                          </strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="pd-muted">
+                        Your pie chart will show
+                        the spending mix as
+                        confirmed payments
+                        arrive.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* TRANSACTIONS */}
+              <section className="pd-transactions">
+                <div className="pd-between pd-history-heading">
+                  <p className="pd-eyebrow">
+                    YOUR ON-CHAIN ACTIVITY
+                  </p>
+
+                  <button
+                    className="pd-text-button"
+                    onClick={() =>
+                      navigate(
+                        "/parent/transactions"
+                      )
+                    }
+                  >
+                    View full history
+                    <ArrowUpRight
+                      size={15}
+                    />
+                  </button>
+                </div>
+
+                <TransactionTable
+                  transactions={transactions.slice(
+                    0,
+                    10
+                  )}
+                  loading={
+                    loading &&
+                    !transactions.length
+                  }
+                  demoMode={demoMode}
+                  title="Recent Transactions"
+                />
+              </section>
+            </div>
+
+            {/* RIGHT SIDEBAR */}
+            <aside className="pd-secondary-column">
+              {/* PENDING REQUESTS */}
+              <section className="card pd-requests">
+                <div className="pd-section-header">
+                  <div>
+                    <p className="pd-eyebrow">
+                      NEEDS YOUR ATTENTION
+                    </p>
+
+                    <h2>
+                      <Bell size={18} />
+                      Pending Requests
+                    </h2>
+                  </div>
+
+                  <span className="pd-count">
+                    <AnimatedNumber
+                      value={
+                        pendingRequests.length
+                      }
+                      format={(v) =>
+                        String(
+                          Math.round(v)
+                        )
+                      }
+                    />
+                  </span>
+                </div>
+
+                <p className="pd-muted">
+                  You have the final say on
+                  every request.
+                </p>
+
+                <DecisionFeedback
+                  decision={decision}
+                  onDone={clearDecision}
+                />
+
+                {loading &&
+                !pendingRequests.length ? (
+                  <div className="pd-empty">
+                    <LoadingSpinner size="md" />
+                  </div>
+                ) : !pendingRequests.length ? (
+                  <div className="pd-empty">
+                    <CheckCircle2 size={30} />
+
+                    <h3>
+                      You're all caught up
+                    </h3>
+
+                    <p>
+                      New spending requests
+                      will appear here.
+                    </p>
                   </div>
                 ) : (
-                  <ul className="space-y-3" aria-label="Pending spending requests">
-                    {pendingRequests.map((req) => (
-                      <li
-                        key={String(req.id)}
-                        onClick={() => setApprovalTarget(req)}
-                        role="button" tabIndex={0}
-                        onKeyDown={(e) => e.key === "Enter" && setApprovalTarget(req)}
-                        className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 cursor-pointer hover:bg-amber-100 transition-colors"
-                        aria-label={`Review request for ${formatToken(req.amount)}`}
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-800 tabular-nums">{formatToken(req.amount)}</p>
-                          {req.memo && <p className="text-xs text-gray-500 truncate">{req.memo}</p>}
-                          <p className="text-xs text-gray-400 font-mono mt-0.5">{shortenAddress(req.recipient)}</p>
-                        </div>
-                        <span className="badge-pending flex-shrink-0 whitespace-nowrap">Review →</span>
-                      </li>
-                    ))}
+                  <ul className="pd-request-list">
+                    {pendingRequests.map(
+                      (req, index) => (
+                        <li
+                          key={String(req.id)}
+                          style={{
+                            "--request-delay": `${
+                              Math.min(
+                                index,
+                                6
+                              ) * 65
+                            }ms`,
+                          }}
+                        >
+                          <div className="pd-between">
+                            <strong>
+                              {formatToken(
+                                req.amount
+                              )}
+                            </strong>
+
+                            <span className="badge-pending">
+                              Pending
+                            </span>
+                          </div>
+
+                          <p>
+                            {req.memo ||
+                              "Spending request"}
+                          </p>
+
+                          <span
+                            className="pd-wallet-address"
+                            title={
+                              req.recipient
+                            }
+                          >
+                            {shortenAddress(
+                              req.recipient,
+                              8
+                            )}
+                          </span>
+
+                          <div className="pd-request-actions">
+                            <button
+                              className="pd-review-button"
+                              onClick={() =>
+                                setApprovalTarget(
+                                  req
+                                )
+                              }
+                              disabled={
+                                !canManage
+                              }
+                              aria-label={`Review and approve request ${req.id}`}
+                            >
+                              Approve
+                              <CheckCircle2
+                                size={14}
+                              />
+                            </button>
+
+                            <button
+                              className="pd-review-button pd-reject-button"
+                              onClick={() =>
+                                setApprovalTarget(
+                                  req
+                                )
+                              }
+                              disabled={
+                                !canManage
+                              }
+                              aria-label={`Review and reject request ${req.id}`}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </li>
+                      )
+                    )}
                   </ul>
                 )}
+              </section>
+
+              {/* KIDSAFE PROTECTION */}
+              <section className="pd-protection">
+                <div className="pd-between">
+                  <ShieldCheck size={25} />
+
+                  <span className="pd-protection-badge">
+                    {demoMode
+                      ? "Demo"
+                      : error
+                      ? "Sync issue"
+                      : !account
+                      ? "Wallet disconnected"
+                      : !isCorrectChain
+                      ? "Switch network"
+                      : "Wallet connected"}
+                  </span>
+                </div>
+
+                <h2>
+                  KidSafe Protection
+                </h2>
+
+                <p>
+                  Built-in guardrails for
+                  growing independence.
+                </p>
+
+                <div>
+                  <span>
+                    <CheckCircle2 size={14} />
+                    Daily spending limits
+                  </span>
+
+                  <span>
+                    <CheckCircle2 size={14} />
+                    Approved dApp controls
+                  </span>
+
+                  <span>
+                    <CheckCircle2 size={14} />
+                    Parent approval for requests
+                  </span>
+                </div>
+
+                <footer>
+                  <Activity size={13} />
+
+                  {demoMode
+                    ? "Simulated blockchain activity"
+                    : network?.name ||
+                      "Configured network"}
+
+                  {!demoMode &&
+                    KIDSAFE_ADDRESS && (
+                      <span
+                        title={
+                          KIDSAFE_ADDRESS
+                        }
+                      >
+                        {shortenAddress(
+                          KIDSAFE_ADDRESS
+                        )}
+                      </span>
+                    )}
+                </footer>
+              </section>
+            </aside>
+          </div>
+
+          {/* APPROVED DAPPS */}
+          <section className="card pd-recipient-section">
+            <div className="pd-section-header">
+              <div>
+                <p className="pd-eyebrow">
+                  TRUSTED DAPPS
+                </p>
+
+                <h2>
+                  Approved dApps
+                </h2>
+
+                <p className="pd-muted">
+                  Manage approved dApp contract
+                  addresses for your child's
+                  payments.
+                </p>
               </div>
 
-              {/* Approved recipients */}
-              <WhitelistManager
-                childAddress={childAddress || (isDemoMode ? MOCK_CHILD_ADDRESS : "")}
-                approvedRecipients={approvedRecipients}
-                loading={loading}
-                onUpdate={refetch}
-              />
-
-              {/* Settings shortcut */}
-              <button
-                onClick={() => navigate("/parent/settings")}
-                className="card w-full flex items-center justify-between p-4 hover:shadow-card-hover transition-shadow cursor-pointer text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
-                    <Settings size={16} className="text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Security & Settings</p>
-                    <p className="text-xs text-gray-400">Wallet, network, limits</p>
-                  </div>
-                </div>
-                <ArrowRight size={16} className="text-gray-300" />
-              </button>
+              <span className="pd-chip">
+                {approvedRecipients.length}{" "}
+                on-chain approved
+              </span>
             </div>
-          </div>
+
+            <form
+              onSubmit={handleNamedRecipient}
+              className="pd-recipient-form"
+            >
+              <label className="pd-field">
+                dApp Name
+
+                <input
+                  className="input"
+                  value={recipientName}
+                  onChange={(e) =>
+                    setRecipientName(
+                      e.target.value
+                    )
+                  }
+                  placeholder="e.g. Example dApp"
+                  required
+                />
+              </label>
+
+              <label className="pd-field">
+                dApp Contract Address
+
+                <input
+                  className="input font-mono"
+                  value={recipientAddress}
+                  onChange={(e) =>
+                    setRecipientAddress(
+                      e.target.value
+                    )
+                  }
+                  placeholder="0x…"
+                  required
+                />
+              </label>
+
+              <button
+                className="btn-primary"
+                disabled={
+                  !canManage ||
+                  !recipientName.trim() ||
+                  !isValidAddress(
+                    recipientAddress
+                  ) ||
+                  txLoading.addRecipient
+                }
+              >
+                {txLoading.addRecipient ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <Plus size={16} />
+                )}
+
+                Approve dApp
+              </button>
+            </form>
+
+            <p className="pd-footnote">
+              Approving a new dApp contract
+              address requires a blockchain
+              transaction. dApp names are
+              display labels for this session.
+            </p>
+
+            <div
+              className="pd-recipient-grid"
+              role="list"
+              aria-label="Approved dApps"
+            >
+              {approvedRecipients.map(
+                (address) => (
+                  <div
+                    className="pd-recipient"
+                    role="listitem"
+                    key={address}
+                  >
+                    <div className="pd-recipient-icon">
+                      <ShieldCheck size={19} />
+                    </div>
+
+                    <div>
+                      <strong>
+                        {names[
+                          address.toLowerCase()
+                        ] ||
+                          "Approved dApp"}
+                      </strong>
+
+                      <p
+                        className="pd-wallet-address"
+                        title={address}
+                      >
+                        {shortenAddress(
+                          address,
+                          8
+                        )}
+                      </p>
+                    </div>
+
+                    {names[
+                      address.toLowerCase()
+                    ] && (
+                      <button
+                        className="btn-ghost"
+                        aria-label={`Remove dApp display name for ${
+                          names[
+                            address.toLowerCase()
+                          ]
+                        }`}
+                        onClick={() =>
+                          setNamedRecipients(
+                            (prev) => {
+                              const updated = {
+                                ...names,
+                              };
+
+                              delete updated[
+                                address.toLowerCase()
+                              ];
+
+                              return {
+                                ...prev,
+                                [selectedChild.toLowerCase()]:
+                                  updated,
+                              };
+                            }
+                          )
+                        }
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+
+            {canManage ? (
+              <details className="pd-wallet-details">
+                <summary>
+                  Manage approved dApps -
+                  approve or remove on-chain
+                </summary>
+
+                <WhitelistManager
+                  childAddress={
+                    selectedChild
+                  }
+                  approvedRecipients={
+                    approvedRecipients
+                  }
+                  loading={loading}
+                  onUpdate={refetch}
+                />
+              </details>
+            ) : (
+              <p className="pd-footnote">
+                Load a child wallet managed by
+                your connected parent account to
+                manage approved dApps.
+              </p>
+            )}
+          </section>
+
+          <footer className="pd-page-footer">
+            <ShieldCheck size={14} />
+
+            KidSafe · A little freedom. A lot
+            of protection.
+
+            <span>
+              {demoMode
+                ? "Demo mode"
+                : "Powered by on-chain controls"}
+            </span>
+          </footer>
         </main>
       </div>
 
       <ApprovalModal
         isOpen={!!approvalTarget}
+        onClose={() =>
+          setApprovalTarget(null)
+        }
         request={approvalTarget}
-        onClose={() => setApprovalTarget(null)}
         onUpdate={refetch}
+        onDecision={(
+          type,
+          request,
+          receipt
+        ) =>
+          setDecision({
+            type,
+            id: String(request.id),
+            demo: !!receipt?.demo,
+          })
+        }
       />
     </div>
   );
-}
-
-// ── Helpers ──────────────────────────────────────────────
-
-function buildChartData(transactions) {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const totals = {};
-  const now = Date.now();
-  transactions.forEach((tx) => {
-    if (tx.status !== "success") return;
-    const ms = Number(tx.timestamp) * 1000;
-    if (now - ms > 7 * 86_400_000) return;
-    const day = days[new Date(ms).getDay()];
-    totals[day] = (totals[day] ?? 0) + toHuman(tx.amount);
-  });
-  return days.map((day) => ({ day, amount: Number((totals[day] ?? 0).toFixed(2)) }));
-}
-
-function buildBreakdown(transactions) {
-  const COLORS = {
-    "School Store":   "#10b981",
-    "Bookshop":       "#3b82f6",
-    "Lunch Canteen":  "#ec4899",
-    "Direct Payment": "#8b5cf6",
-    "Other":          "#f59e0b",
-  };
-  const totals = {};
-  let grand = 0;
-  transactions.forEach((tx) => {
-    if (tx.status !== "success") return;
-    const cat = tx.label ?? tx.type ?? "Other";
-    totals[cat] = (totals[cat] ?? 0) + toHuman(tx.amount);
-    grand += toHuman(tx.amount);
-  });
-  if (grand === 0) return BREAKDOWN_DEMO;
-  return Object.entries(totals).map(([name, value]) => ({
-    name,
-    value: Math.round((value / grand) * 100),
-    color: COLORS[name] ?? "#94a3b8",
-  }));
 }

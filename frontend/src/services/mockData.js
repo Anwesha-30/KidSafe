@@ -30,9 +30,9 @@ export const MOCK_CHILD_DETAILS = {
 
 // ─── Approved recipients ──────────────────────────────────────────────────────
 export const MOCK_APPROVED_RECIPIENTS = [
-  { address: MOCK_RECIPIENT_1, label: "School Store" },
-  { address: MOCK_RECIPIENT_2, label: "Bookshop" },
-  { address: MOCK_RECIPIENT_3, label: "Lunch Canteen" },
+  { address: MOCK_RECIPIENT_1, label: "Pixel Quest", category: "Games", description: "A fictional Web3 game for exploring avatar and game-item payments." },
+  { address: MOCK_RECIPIENT_2, label: "Creator Lab", category: "Create", description: "A fictional creative dApp for exploring digital art and creation tools." },
+  { address: MOCK_RECIPIENT_3, label: "Orbit Academy", category: "Learn", description: "A fictional learning dApp for exploring Web3 lessons and learning passes." },
 ];
 
 // ─── Token balances ───────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ export const MOCK_TRANSACTIONS = [
     blockNumber: 42,
     type:      "Direct Payment",
     status:    "success",
-    label:     "Lunch Canteen",
+    label:     "Orbit Academy",
   },
   {
     txHash:    "0xabc1230000000000000000000000000000000000000000000000000000000002",
@@ -66,7 +66,7 @@ export const MOCK_TRANSACTIONS = [
     blockNumber: 41,
     type:      "Direct Payment",
     status:    "success",
-    label:     "School Store",
+    label:     "Pixel Quest",
   },
   {
     txHash:    "0xabc1230000000000000000000000000000000000000000000000000000000003",
@@ -78,7 +78,7 @@ export const MOCK_TRANSACTIONS = [
     blockNumber: 38,
     type:      "Approved Request",
     status:    "success",
-    label:     "Bookshop",
+    label:     "Creator Lab",
   },
   {
     txHash:    "0xabc1230000000000000000000000000000000000000000000000000000000004",
@@ -90,7 +90,7 @@ export const MOCK_TRANSACTIONS = [
     blockNumber: 35,
     type:      "Approved Request",
     status:    "success",
-    label:     "School Store",
+    label:     "Pixel Quest",
   },
   {
     txHash:    null,
@@ -102,7 +102,7 @@ export const MOCK_TRANSACTIONS = [
     blockNumber: null,
     type:      "Direct Payment",
     status:    "rejected",
-    label:     "Lunch Canteen",
+    label:     "Orbit Academy",
     rejectReason: "Daily limit exceeded",
   },
 ];
@@ -114,44 +114,44 @@ export const MOCK_REQUESTS = [
     child:      MOCK_CHILD_ADDRESS,
     recipient:  MOCK_RECIPIENT_1,
     amount:     25_000_000n,
-    memo:       "New school supplies",
+    memo:       "Pixel Quest avatar purchase",
     status:     RequestStatus.Pending,
     createdAt:  BigInt(now - 1800),
     resolvedAt: 0n,
-    label:      "School Store",
+    label:      "Pixel Quest",
   },
   {
     id:         BigInt(3),
     child:      MOCK_CHILD_ADDRESS,
     recipient:  MOCK_RECIPIENT_3,
     amount:     60_000_000n,
-    memo:       "Lunch for the week",
+    memo:       "Orbit Academy learning pass",
     status:     RequestStatus.Rejected,
     createdAt:  BigInt(now - DAY * 2 - 3600),
     resolvedAt: BigInt(now - DAY * 2),
-    label:      "Lunch Canteen",
+    label:      "Orbit Academy",
   },
   {
     id:         BigInt(2),
     child:      MOCK_CHILD_ADDRESS,
     recipient:  MOCK_RECIPIENT_1,
     amount:     20_000_000n,
-    memo:       "Art class materials",
+    memo:       "Creator Lab digital art tools",
     status:     RequestStatus.Approved,
     createdAt:  BigInt(now - DAY * 2 - 7200),
     resolvedAt: BigInt(now - DAY * 2),
-    label:      "School Store",
+    label:      "Pixel Quest",
   },
   {
     id:         BigInt(1),
     child:      MOCK_CHILD_ADDRESS,
     recipient:  MOCK_RECIPIENT_2,
     amount:     15_000_000n,
-    memo:       "Science textbook",
+    memo:       "Creator Lab creation pack",
     status:     RequestStatus.Approved,
     createdAt:  BigInt(now - DAY - 3600),
     resolvedAt: BigInt(now - DAY),
-    label:      "Bookshop",
+    label:      "Creator Lab",
   },
 ];
 

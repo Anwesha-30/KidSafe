@@ -21,6 +21,8 @@ import LoadingSpinner from "./LoadingSpinner";
  */
 export default function RequestModal({
   isOpen,
+  initialRecipient = "",
+  recipientLabels = {},
   onClose,
   approvedRecipients = [],
   allowanceBalance = 0n,
@@ -29,7 +31,7 @@ export default function RequestModal({
   mode = "request",
   onSuccess,
 }) {
-  const [recipient, setRecipient] = useState("");
+  const [recipient, setRecipient] = useState(initialRecipient);
   const [amount, setAmount]       = useState("");
   const [memo, setMemo]           = useState("");
   const { makePayment, requestPayment, loading } = useKidSafe();
@@ -82,7 +84,7 @@ export default function RequestModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 id="req-modal-title" className="text-lg font-bold text-gray-900">
-            {isDirect ? "Send Payment" : "Request Payment"}
+            {isDirect ? "Pay an approved dApp" : "Request a dApp payment"}
           </h2>
           <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close modal">
             <X size={18} />
@@ -106,7 +108,7 @@ export default function RequestModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Recipient */}
           <div>
-            <label htmlFor="req-recipient" className="input-label">Recipient Address</label>
+            <label htmlFor="req-recipient" className="input-label">Approved dApp payment address</label>
             {approvedRecipients.length > 0 ? (
               <select
                 id="req-recipient"
@@ -115,10 +117,10 @@ export default function RequestModal({
                 className="input"
                 required
               >
-                <option value="">Select approved recipient…</option>
+                <option value="">Select an approved dApp…</option>
                 {approvedRecipients.map((addr) => (
                   <option key={addr} value={addr}>
-                    {shortenAddress(addr, 10)}
+                    {recipientLabels[addr.toLowerCase()] ? `${recipientLabels[addr.toLowerCase()]} · ${shortenAddress(addr, 6)}` : shortenAddress(addr, 10)}
                   </option>
                 ))}
               </select>
@@ -166,7 +168,7 @@ export default function RequestModal({
                 maxLength={MAX_MEMO_LENGTH}
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
-                placeholder="What is this payment for?"
+                placeholder="Which digital item or dApp purchase is this for?"
                 className="input"
               />
               <p className="text-xs text-gray-400 mt-1 text-right">{memo.length}/{MAX_MEMO_LENGTH}</p>

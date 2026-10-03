@@ -24,6 +24,7 @@ export default function TransactionTable({
   loading = false,
   demoMode = false,
   title = "Transaction History",
+  className = "",
 }) {
   const [filter, setFilter] = useState("All");
 
@@ -36,7 +37,7 @@ export default function TransactionTable({
   });
 
   return (
-    <div className="card">
+    <div className={`card ${className}`}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
