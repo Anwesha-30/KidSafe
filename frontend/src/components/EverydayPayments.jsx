@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ShoppingBag, ShieldCheck, AlertTriangle, Camera, Upload, X } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, AlertTriangle, Camera, Upload, X, PlusCircle } from 'lucide-react';
 import { useEverydayPayments } from '@/hooks/useEverydayPayments';
 import { everydayAvailable, everydayMoney } from '@/services/everydayModel';
 import QRScanner from '@/components/QRScanner';
 import { parseUpiQr } from '@/utils/parseUpiQr';
 
 export default function EverydayPayments({ mode }) {
-  const { state, error, submit, review } = useEverydayPayments();
+  const { state, error, submit, review, topup } = useEverydayPayments();
   const [message, setMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [remember, setRemember] = useState({});
@@ -14,6 +14,8 @@ export default function EverydayPayments({ mode }) {
   const [form, setForm] = useState({ merchantName: '', merchantId: '', item: '', amount: '', category: 'Snacks / groceries' });
   const [qrOpen, setQrOpen] = useState(false);
   const [qrFeedback, setQrFeedback] = useState('');
+  const [topupAmt, setTopupAmt] = useState('');
+  const [topupOpen, setTopupOpen] = useState(false);
   const pending = state.requests.filter(r => r.status === 'pending');
   function change(key, value) { setForm(current => ({ ...current, [key]: value })); }
 
@@ -45,6 +47,16 @@ export default function EverydayPayments({ mode }) {
   function decide(request, decision) {
     setActionError(''); setMessage('');
     try { review(request.id, decision, !!remember[request.id]); setMessage(decision === 'approve' ? 'Approved: the demo payment is complete.' : 'Declined: no payment was made.'); } catch (err) { setActionError(err.message); }
+  }
+  function handleTopup(e) {
+    e.preventDefault(); setActionError(''); setMessage('');
+    try {
+      if (!/^\d+(\.\d{1,2})?$/.test(topupAmt)) throw new Error('Enter a valid amount.');
+      topup(Math.round(Number(topupAmt) * 100));
+      setMessage(`₹${parseFloat(topupAmt).toFixed(2)} added to the everyday cash balance.`);
+      setTopupAmt('');
+      setTopupOpen(false);
+    } catch (err) { setActionError(err.message); }
   }
   return <section className="card everyday-payments mb-6" aria-labelledby={`everyday-title-${mode}`}>
     <div className="flex flex-wrap items-center justify-between gap-3 mb-3"><h2 id={`everyday-title-${mode}`} className="section-title flex items-center gap-2"><ShoppingBag size={20} /> Everyday payments</h2><span className="badge-info">Local demo · INR</span></div>
@@ -87,7 +99,45 @@ export default function EverydayPayments({ mode }) {
         <div className="flex items-end pb-1"><button type="submit" disabled={!!error} className="btn-primary w-full"><ShieldCheck size={16} /> Review purchase</button></div>
       </form>
     </>}
-    {mode === 'parent' && <p className="text-xs text-gray-500 mb-4">Warnings use simple rules on child-entered details, not verified merchant data or fraud detection. No warning does not guarantee a safe purchase. Check the merchant and item with your child.</p>}
+    {mode === 'parent' && <>
+      {/* ── Top-up panel ─────────────────────────────── */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-4">
+        {topupOpen ? (
+          <form onSubmit={handleTopup} className="flex flex-wrap items-end gap-3">
+            <label className="input-label flex-1 min-w-[140px]">
+              Add cash (₹)
+              <input
+                className="input mt-1"
+                required
+                inputMode="decimal"
+                placeholder="e.g. 500"
+                value={topupAmt}
+                onChange={e => setTopupAmt(e.target.value)}
+                autoFocus
+              />
+            </label>
+            <div className="flex gap-2 pb-1">
+              <button type="submit" className="btn-primary flex items-center gap-2">
+                <PlusCircle size={15} /> Add cash
+              </button>
+              <button type="button" className="btn-ghost" onClick={() => { setTopupOpen(false); setTopupAmt(''); }}>
+                <X size={15} />
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setTopupOpen(true); setActionError(''); setMessage(''); }}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <PlusCircle size={15} /> Add cash to everyday balance
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-500 mb-4">Warnings use simple rules on child-entered details, not verified merchant data or fraud detection. No warning does not guarantee a safe purchase. Check the merchant and item with your child.</p>
+    </>}
+    {mode !== 'parent' && null}
     <ul className="space-y-3">{state.requests.map(request => <li key={request.id} className="everyday-request rounded-xl border border-gray-200 p-4">
       <div className="flex flex-wrap justify-between gap-2"><strong>{request.merchantName} · {everydayMoney(request.amount)}</strong><span className={request.status === 'paid' ? 'badge-success' : request.status === 'rejected' ? 'badge-rejected' : 'badge-pending'}>{request.status === 'paid' ? 'Demo paid' : request.status === 'rejected' ? 'Declined · not paid' : 'Waiting · not paid'}</span></div>
       <p className="text-sm text-gray-600 mt-2">{request.item} · {request.category}</p><p className="text-xs text-gray-500 mt-1 break-all">Payment ID: {request.merchantId}</p>

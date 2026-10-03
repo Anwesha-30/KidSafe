@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { initialEveryday, submitEveryday, reviewEveryday } from '@/services/everydayModel';
+import { initialEveryday, submitEveryday, reviewEveryday, topupEveryday } from '@/services/everydayModel';
 import { useWallet } from './useWallet';
 const KEY = 'kidsafe_everyday_demo_v1';
 const EVENT = 'kidsafe-everyday-demo';
@@ -28,5 +28,5 @@ export function useEverydayPayments() {
     window.dispatchEvent(new Event(EVENT));
     return next;
   }
-  return { state, error, submit: input => update(current => submitEveryday(current, input, role)), review: (id, decision, remember) => update(current => reviewEveryday(current, id, decision, remember, role)) };
+  return { state, error, submit: input => update(current => submitEveryday(current, input, role)), review: (id, decision, remember) => update(current => reviewEveryday(current, id, decision, remember, role)), topup: amountPaise => update(current => topupEveryday(current, amountPaise, role)) };
 }

@@ -33,6 +33,12 @@ export function submitEveryday(state, input, role, now = Date.now(), id = crypto
   const status = state.approved[merchantId] && warnings.length === 0 ? 'paid' : 'pending';
   return { ...state, balance: state.balance - (status === 'paid' ? request.amount : 0), requests: [{ ...request, warnings, status, resolvedAt: status === 'paid' ? now : null }, ...state.requests] };
 }
+export function topupEveryday(state, amountPaise, role) {
+  if (role !== 'parent') throw new Error('Only Parent view can add cash.');
+  if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) throw new Error('Enter a valid amount greater than zero.');
+  if (amountPaise > 1000000) throw new Error('Maximum single top-up is ₹10,000.');
+  return { ...state, balance: state.balance + amountPaise };
+}
 export function reviewEveryday(state, id, decision, remember, role, now = Date.now()) {
   if (role !== 'parent') throw new Error('Only Parent view can review a purchase.');
   if (!['approve', 'reject'].includes(decision)) throw new Error('Choose approve or reject.');
