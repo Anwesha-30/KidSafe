@@ -16,22 +16,72 @@ import { Camera, Upload, X, AlertCircle } from 'lucide-react';
 
 /* ── helpers ──────────────────────────────────────────── */
 
-/** Decode a single ImageData (from canvas) with jsQR. Returns text or null. */
+/** Decode a single ImageData with jsQR, trying both inversion modes. */
 function decodeImageData(imageData) {
-  const code = jsQR(imageData.data, imageData.width, imageData.height, {
-    inversionAttempts: 'dontInvert',
-  });
-  return code ? code.data : null;
+  for (const inv of ['dontInvert', 'attemptBoth', 'invertFirst']) {
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: inv,
+    });
+    if (code) return code.data;
+  }
+  return null;
 }
 
-/** Draw an <img|HTMLImageElement|HTMLVideoElement> into an offscreen canvas and decode. */
-function decodeElement(source, width, height) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(source, 0, 0, width, height);
-  return decodeImageData(ctx.getImageData(0, 0, width, height));
+/**
+ * Boost contrast on a canvas context's ImageData to help jsQR read
+ * low-contrast / photographed QR codes.
+ */
+function boostContrast(ctx, w, h) {
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    // greyscale
+    const grey = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    // hard threshold → pure black/white
+    const v = grey < 128 ? 0 : 255;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+/**
+ * Try to decode a QR from an image/video source.
+ * Attempts: native size, 2× upscale, 4× upscale, center-crop 60 %, each with
+ * a plain pass and a contrast-boosted pass — 8 attempts total.
+ */
+function decodeElement(source, naturalW, naturalH) {
+  const attempts = [
+    // [destW, destH, srcX, srcY, srcW, srcH]
+    [naturalW,     naturalH,     0, 0, naturalW, naturalH],           // native
+    [naturalW * 2, naturalH * 2, 0, 0, naturalW, naturalH],           // 2× up
+    [naturalW * 4, naturalH * 4, 0, 0, naturalW, naturalH],           // 4× up
+    // centre crop (inner 60 %)
+    [naturalW,     naturalH,
+      naturalW * 0.2, naturalH * 0.2,
+      naturalW * 0.6, naturalH * 0.6],
+    [naturalW * 2, naturalH * 2,
+      naturalW * 0.2, naturalH * 0.2,
+      naturalW * 0.6, naturalH * 0.6],
+  ];
+
+  for (const [dw, dh, sx, sy, sw, sh] of attempts) {
+    const canvas = document.createElement('canvas');
+    canvas.width  = dw;
+    canvas.height = dh;
+    const ctx = canvas.getContext('2d');
+
+    // plain draw
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
+    let result = decodeImageData(ctx.getImageData(0, 0, dw, dh));
+    if (result) return result;
+
+    // contrast-boosted draw
+    ctx.drawImage(source, sx, sy, sw, sh, 0, 0, dw, dh);
+    boostContrast(ctx, dw, dh);
+    result = decodeImageData(ctx.getImageData(0, 0, dw, dh));
+    if (result) return result;
+  }
+  return null;
 }
 
 /* ── CameraScanner ────────────────────────────────────── */
@@ -129,8 +179,9 @@ function CameraScanner({ onResult, onClose }) {
 
 function UploadScanner({ onResult, onClose }) {
   const inputRef = useRef(null);
-  const [err, setErr]         = useState('');
-  const [preview, setPreview] = useState(null);
+  const [err, setErr]             = useState('');
+  const [preview, setPreview]     = useState(null);
+  const [scanning, setScanning]   = useState(false);
 
   function handleFile(event) {
     setErr('');
@@ -141,16 +192,24 @@ function UploadScanner({ onResult, onClose }) {
     reader.onload = (e) => {
       const src = e.target.result;
       setPreview(src);
+      setScanning(true);
       const img = new Image();
       img.onload = () => {
-        const text = decodeElement(img, img.naturalWidth, img.naturalHeight);
-        if (text) {
-          onResult(text);
-        } else {
-          setErr('No QR code detected in this image. Try a clearer photo or scan the code directly.');
-        }
+        // run in a microtask so React can render the "Scanning…" state first
+        setTimeout(() => {
+          const text = decodeElement(img, img.naturalWidth, img.naturalHeight);
+          setScanning(false);
+          if (text) {
+            onResult(text);
+          } else {
+            setErr(
+              'No QR code detected. Tips: use a straight-on photo of just the QR, ' +
+              'good lighting, and avoid photos of screens if possible.'
+            );
+          }
+        }, 0);
       };
-      img.onerror = () => setErr('Could not load the image.');
+      img.onerror = () => { setScanning(false); setErr('Could not load the image.'); };
       img.src = src;
     };
     reader.readAsDataURL(file);
@@ -170,6 +229,10 @@ function UploadScanner({ onResult, onClose }) {
         />
       )}
 
+      {scanning && (
+        <p className="text-xs text-blue-600 animate-pulse">Scanning for QR code…</p>
+      )}
+
       {err && (
         <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 text-red-700 p-3 text-sm w-full">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
@@ -180,10 +243,11 @@ function UploadScanner({ onResult, onClose }) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="btn-secondary flex items-center gap-2"
+        disabled={scanning}
+        className="btn-secondary flex items-center gap-2 disabled:opacity-50"
       >
         <Upload size={15} />
-        {preview ? 'Try another image' : 'Choose QR image'}
+        {scanning ? 'Scanning…' : preview ? 'Try another image' : 'Choose QR image'}
       </button>
 
       {/* hidden file input — images only */}
