@@ -14,6 +14,7 @@ import Navbar from "@/components/Navbar";
 import { DashboardRoleArt } from "@/components/RoleTransition";
 import Sidebar from "@/components/Sidebar";
 import ChildWelcome from "@/components/ChildWelcome";
+import EverydayPayments from "@/components/EverydayPayments";
 import DappExplorer from "@/components/DappExplorer";
 import StatCard from "@/components/StatCard";
 import TransactionTable from "@/components/TransactionTable";
@@ -210,6 +211,8 @@ export default function ChildDashboard() {
             <div className="flex-1 min-w-0"><p className="font-bold text-violet-900 flex items-center gap-2"><Sparkles size={17} aria-hidden="true" /> Web3 explorer tip</p><p className="text-sm text-violet-800 mt-1" aria-live="polite">{tips[tipIndex]}</p></div>
             <button type="button" onClick={() => setTipIndex((index) => (index + 1) % tips.length)} className="kid-action min-h-11 inline-flex items-center gap-1 text-sm font-semibold text-violet-800 rounded-xl bg-white px-4 py-3">Next tip <ChevronRight size={16} aria-hidden="true" /></button>
           </section>
+
+          <EverydayPayments mode="child" />
 
           <DappExplorer recipients={approvedRecipients} demoMode={demoMode} loading={loading} canPay={canPay} onChoose={openModal} motionDisabled={motionPaused || reducedMotion} />
 

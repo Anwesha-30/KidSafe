@@ -592,3 +592,10 @@
 @media (max-height: 650px) and (min-width: 640px) { .parent-welcome { min-height: 720px; } .parent-figure-scene { height: 44%; } }
 .parent-welcome.parent-motion-off *, .parent-welcome.parent-motion-off *::before { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .parent-welcome *, .parent-welcome *::before { animation: none !important; transition: none !important; } }
+
+/* Everyday purchase demo: match the existing child dashboard surfaces. */
+.child-dashboard .everyday-payments .input-label { color: #d3e2f5; }
+.child-dashboard .everyday-payments .input { background: #102b46; color: #eff6ff; border-color: #45678c; }
+.child-dashboard .everyday-payments .input::placeholder { color: #9fb8d5; }
+.child-dashboard .everyday-request { border-color: #45678c; background: #233f62; }
+.child-dashboard .everyday-payments [role="status"] { color: #7ee6c0; }

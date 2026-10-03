@@ -32,6 +32,7 @@ import {
 
 import Navbar from "@/components/Navbar";
 import { DashboardRoleArt, useRoleTransition } from "@/components/RoleTransition";
+import EverydayPayments from "@/components/EverydayPayments";
 import ParentWelcome from "@/components/ParentWelcome";
 import Sidebar from "@/components/Sidebar";
 import TransactionTable from "@/components/TransactionTable";
@@ -762,6 +763,8 @@ export default function ParentDashboard() {
               {formError}
             </p>
           )}
+
+          <EverydayPayments mode="parent" />
 
           {/* SUMMARY */}
           <section
